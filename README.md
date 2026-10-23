@@ -24,7 +24,21 @@ in a built-in terminal.
 
 ## Install
 
-There's no packaged download yet. To run Pyx, build it from source (below).
+Download the latest version from the
+[Releases page](https://github.com/nyx-12689/pyx/releases/latest). It needs macOS 13
+or later. Pick the disk image for your Mac:
+
+| Your Mac | Download |
+|---|---|
+| Apple Silicon (M1 and later) | `Pyx_<version>_aarch64.dmg` |
+| Intel | `Pyx_<version>_x64.dmg` |
+| Not sure | `Pyx_<version>_universal.dmg` (works on both, about twice the size) |
+
+Open the disk image and drag Pyx into Applications.
+
+Pyx isn't signed with an Apple Developer certificate yet, so macOS blocks it the first
+time you open it. Open it once, then go to **System Settings → Privacy & Security**
+and click **Open Anyway**. You only need to do this once.
 
 Pyx needs **ffmpeg** and **ImageMagick**. If they're missing, Pyx offers to install
 them through [Homebrew](https://brew.sh), or you can run:
@@ -60,8 +74,8 @@ never part of the real app.
   few seconds; trimming and other edits; more audio tools.
 - **Windows and Linux**: find and install ffmpeg and ImageMagick without Homebrew,
   and adapt the window chrome for each platform.
-- **Downloads**: signed, notarized macOS builds, then installers for the other
-  platforms, with automatic updates.
+- **Downloads**: signed and notarized macOS builds (so macOS doesn't block the first
+  launch), installers for the other platforms, and automatic updates.
 - Real progress for image jobs, and saved presets for tools you use often.
 
 Ideas and bug reports are welcome in [Issues](../../issues).
