@@ -15,6 +15,7 @@ import type {
   MediaInfo,
   Operation,
   OperationType,
+  StripOptions,
   VideoOptions,
 } from "@/lib/types"
 import { toolById } from "@/tools/registry"
@@ -77,6 +78,7 @@ interface Options {
   video: VideoOptions
   audio: AudioOptions
   gif: GifOptions
+  strip: StripOptions
 }
 
 /** How far back history is loaded: enough for the Dashboard's 90-day comparison and calendar. */
@@ -246,6 +248,7 @@ export const useApp = create<AppState>()(
           video: { container: "mp4", codec: "h264Hw", quality: 60, maxHeight: null, fps: null, removeAudio: false },
           audio: { format: "mp3", bitrate: 192, normalize: false },
           gif: { fps: 12, width: 480 },
+          strip: { keepColorProfile: true },
         },
         settings: {
           outputDir: null,

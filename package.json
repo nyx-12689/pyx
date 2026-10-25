@@ -1,7 +1,7 @@
 {
   "name": "pyx",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A media workbench for macOS, built on ffmpeg and ImageMagick.",
   "license": "MIT",
   "type": "module",

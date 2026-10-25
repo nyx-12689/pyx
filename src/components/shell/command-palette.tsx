@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
-import { Activity, Boxes, Download, LayoutDashboard, Settings, SquareTerminal, Wrench } from "lucide-react"
+import { Activity, BookOpen, Boxes, Download, LayoutDashboard, Settings, SquareTerminal, Wrench } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
 
 import {
@@ -40,6 +40,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     { label: "Dashboard", icon: LayoutDashboard, to: "/" as const },
     { label: "All tools", icon: Wrench, to: "/tools" as const },
     { label: "Activity", icon: Activity, to: "/activity" as const },
+    { label: "Formats guide", icon: BookOpen, to: "/formats" as const },
     { label: "Dependencies", icon: Boxes, to: "/dependencies" as const },
     { label: "Settings", icon: Settings, to: "/settings" as const },
   ]

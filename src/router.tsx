@@ -4,6 +4,9 @@ import { AppShell } from "@/components/shell/app-shell"
 import { ActivityPage } from "@/pages/activity"
 import { DashboardPage } from "@/pages/dashboard"
 import { DependenciesPage } from "@/pages/dependencies"
+import { FormatArticlePage } from "@/pages/format-article"
+import { FormatsPage } from "@/pages/formats"
+import type { GuideSectionId } from "@/lib/format-guide"
 import { SettingsPage } from "@/pages/settings"
 import { ToolWorkspacePage } from "@/pages/tool-workspace"
 import { ToolsPage } from "@/pages/tools"
@@ -51,6 +54,26 @@ const dependenciesRoute = createRoute({
   component: DependenciesPage,
 })
 
+// The Formats wiki: /formats lists a section's formats, /formats/<id> is one format's article.
+const formatsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/formats" })
+
+const formatsIndexRoute = createRoute({
+  getParentRoute: () => formatsRoute,
+  path: "/",
+  component: FormatsPage,
+  validateSearch: (search: Record<string, unknown>): { section?: GuideSectionId } => ({
+    section: ["images", "video", "audio", "gif"].includes(search.section as string)
+      ? (search.section as GuideSectionId)
+      : undefined,
+  }),
+})
+
+const formatArticleRoute = createRoute({
+  getParentRoute: () => formatsRoute,
+  path: "$formatId",
+  component: FormatArticlePage,
+})
+
 const settingsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/settings", component: SettingsPage })
 
 const routeTree = rootRoute.addChildren([
@@ -59,6 +82,7 @@ const routeTree = rootRoute.addChildren([
   toolRoute,
   activityRoute,
   dependenciesRoute,
+  formatsRoute.addChildren([formatsIndexRoute, formatArticleRoute]),
   settingsRoute,
 ])
 

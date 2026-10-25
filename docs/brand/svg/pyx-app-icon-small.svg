@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>Pyx</title>
+<defs>
+  <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#2B2E35"/><stop offset="1" stop-color="#0E0F12"/>
+  </linearGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FFFFFF" stop-opacity=".22"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity="0"/>
+  </linearGradient>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+    <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity=".28"/>
+  </filter>
+</defs>
+<rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)" filter="url(#shadow)"/>
+<rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+<g transform="translate(182.00 180.00) scale(2.5000)"><path fill="#F5F5F4" fill-rule="evenodd" d="M54 26H150A54 54 0 0 1 204 80V110A54 54 0 0 1 150 164H96V222A8 8 0 0 1 88 230H62A8 8 0 0 1 54 222V34A8 8 0 0 1 62 26ZM96 66H148A16 16 0 0 1 164 82V108A16 16 0 0 1 148 124H96Z"/><path fill="#3987E5" d="M130 75L150 95L130 115L110 95Z"/></g></svg>

@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { Link, useLocation } from "@tanstack/react-router"
-import { Activity, Boxes, LayoutDashboard, Pencil, Pin, PinOff, Settings, Wrench } from "lucide-react"
+import { Activity, BookOpen, Boxes, LayoutDashboard, Pencil, Pin, PinOff, Settings, Wrench } from "lucide-react"
 
 import { PixelHeading } from "@/components/ui/pixel-heading-character"
+import { PyxMark } from "@/components/pyx-mark"
 import {
   Sidebar,
   SidebarContent,
@@ -29,12 +30,36 @@ export function AppSidebar() {
   const pinnedTools = useApp((s) => s.settings.pinnedTools)
   const togglePinnedTool = useApp((s) => s.togglePinnedTool)
   const [editingPins, setEditingPins] = useState(false)
-  // Pinned tools in pin order, plus the open tool if it isn't pinned.
+  const pinned = pinnedTools.map((id) => TOOLS.find((t) => t.id === id)).filter((t): t is ToolDef => !!t)
+  // The open tool, when it isn't pinned, shows apart from the pins so you can pin it.
   const openTool = TOOLS.find((t) => pathname === `/tools/${t.id}`)
-  const shownTools = [
-    ...pinnedTools.map((id) => TOOLS.find((t) => t.id === id)).filter((t): t is ToolDef => !!t),
-    ...(openTool && !pinnedTools.includes(openTool.id) ? [openTool] : []),
-  ]
+  const unpinnedOpenTool = openTool && !pinnedTools.includes(openTool.id) ? openTool : undefined
+
+  const toolRow = (tool: ToolDef, isPinned: boolean) => (
+    <SidebarMenuItem key={tool.id}>
+      <SidebarMenuButton
+        asChild
+        isActive={pathname === `/tools/${tool.id}`}
+        tooltip={isPinned ? tool.name : `${tool.name} (not pinned)`}
+      >
+        <Link to="/tools/$toolId" params={{ toolId: tool.id }}>
+          <tool.icon />
+          <span>{tool.name}</span>
+        </Link>
+      </SidebarMenuButton>
+      <SidebarMenuAction
+        showOnHover={isPinned}
+        title={isPinned ? `Unpin ${tool.name}` : `Pin ${tool.name}`}
+        // Blur after the click, or focus keeps the action showing once the row changes.
+        onClick={(e) => {
+          togglePinnedTool(tool.id)
+          e.currentTarget.blur()
+        }}
+      >
+        {isPinned ? <PinOff /> : <Pin />}
+      </SidebarMenuAction>
+    </SidebarMenuItem>
+  )
 
   return (
     // A floating card under the title bar (which holds the traffic lights).
@@ -42,10 +67,16 @@ export function AppSidebar() {
     <Sidebar variant="floating" collapsible="icon" className="h-auto!" style={{ top: TITLE_BAR_HEIGHT }}>
       {/*
         Same height in both states, so the icons below never move when it collapses:
-        the full name fades out and a monogram fades in its place.
+        the app icon's tile stays put and the name beside it fades out.
       */}
       <Link to="/" aria-label="Pyx" className="relative block h-11 shrink-0 overflow-hidden">
-        <span className="absolute top-4 left-4 whitespace-nowrap transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+        <span
+          aria-hidden
+          className="bg-foreground text-background absolute top-2.5 left-2 flex size-8 items-center justify-center rounded-[9px]"
+        >
+          <PyxMark small className="size-6" />
+        </span>
+        <span className="absolute top-4 left-12 whitespace-nowrap transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
           <PixelHeading
             as="h1"
             mode="multi"
@@ -54,12 +85,6 @@ export function AppSidebar() {
           >
             Pyx
           </PixelHeading>
-        </span>
-        <span
-          aria-hidden
-          className="bg-sidebar-accent text-sidebar-accent-foreground absolute top-2.5 left-2 flex size-8 items-center justify-center rounded-lg text-sm font-semibold opacity-0 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-100"
-        >
-          P
         </span>
       </Link>
 
@@ -87,6 +112,14 @@ export function AppSidebar() {
               </SidebarMenuButton>
               {runningCount > 0 && <SidebarMenuBadge>{runningCount}</SidebarMenuBadge>}
             </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname.startsWith("/formats")} tooltip="Formats">
+                <Link to="/formats">
+                  <BookOpen />
+                  <span>Formats</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
 
@@ -110,7 +143,7 @@ export function AppSidebar() {
                 Collapsed: gathered on a tinted pill under its icon. Rows keep their
                 height either way, so nothing moves up or down when it collapses.
               */}
-              {shownTools.length > 0 ? (
+              {pinned.length > 0 && (
                 <ul
                   className={cn(
                     "mt-0.5 flex flex-col gap-0.5 transition-[margin,padding,background-color,border-color] duration-200",
@@ -118,34 +151,29 @@ export function AppSidebar() {
                     "group-data-[collapsible=icon]:bg-sidebar-accent/70 group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:rounded-[10px] group-data-[collapsible=icon]:border-l-0 group-data-[collapsible=icon]:pl-0",
                   )}
                 >
-                  {shownTools.map((tool) => {
-                    const isPinned = pinnedTools.includes(tool.id)
-                    return (
-                      <SidebarMenuItem key={tool.id}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={pathname === `/tools/${tool.id}`}
-                          tooltip={isPinned ? tool.name : `${tool.name} (not pinned)`}
-                          // The open tool shows here even when it isn't pinned, dimmed, so you can pin it.
-                          className={cn(!isPinned && "opacity-60")}
-                        >
-                          <Link to="/tools/$toolId" params={{ toolId: tool.id }}>
-                            <tool.icon />
-                            <span>{tool.name}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                        <SidebarMenuAction
-                          showOnHover={isPinned}
-                          title={isPinned ? `Unpin ${tool.name}` : `Pin ${tool.name}`}
-                          onClick={() => togglePinnedTool(tool.id)}
-                        >
-                          {isPinned ? <PinOff /> : <Pin />}
-                        </SidebarMenuAction>
-                      </SidebarMenuItem>
-                    )
-                  })}
+                  {pinned.map((tool) => toolRow(tool, true))}
                 </ul>
-              ) : (
+              )}
+              {/*
+                The open, unpinned tool: below the pins, behind a dashed line (expanded) or
+                in a dashed outline (collapsed), with a label saying it isn't pinned.
+              */}
+              {unpinnedOpenTool && (
+                <div className="mt-2">
+                  <p className="text-sidebar-foreground/50 mb-0.5 ml-[23px] h-4 text-[11px] leading-4 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+                    Open, not pinned
+                  </p>
+                  <ul
+                    className={cn(
+                      "border-sidebar-foreground/30 ml-[15px] border-l border-dashed pl-[7px] transition-[margin,padding,border-radius] duration-200",
+                      "group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:rounded-[10px] group-data-[collapsible=icon]:border group-data-[collapsible=icon]:pl-0",
+                    )}
+                  >
+                    {toolRow(unpinnedOpenTool, false)}
+                  </ul>
+                </div>
+              )}
+              {pinned.length === 0 && !unpinnedOpenTool && (
                 <button
                   type="button"
                   onClick={() => setEditingPins(true)}

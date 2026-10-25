@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><title>Pyx</title>
+<defs>
+  <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#2B2E35"/><stop offset="1" stop-color="#0E0F12"/>
+  </linearGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FFFFFF" stop-opacity=".22"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity="0"/>
+  </linearGradient>
+  <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+    <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity=".28"/>
+  </filter>
+</defs>
+<rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)" filter="url(#shadow)"/>
+<rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+<g transform="translate(182.00 180.00) scale(2.5000)"><path fill="#F5F5F4" fill-rule="evenodd" d="M66 36H152A46 46 0 0 1 198 82V108A46 46 0 0 1 152 154H98V214A6 6 0 0 1 92 220H72A6 6 0 0 1 66 214V42A6 6 0 0 1 72 36ZM98 68H152A14 14 0 0 1 166 82V108A14 14 0 0 1 152 122H98Z"/><path fill="#3987E5" d="M132 77Q136.5 90.5 150 95Q136.5 99.5 132 113Q127.5 99.5 114 95Q127.5 90.5 132 77Z"/></g></svg>

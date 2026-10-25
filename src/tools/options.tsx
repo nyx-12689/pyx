@@ -245,3 +245,26 @@ export function GifOptionsForm() {
     </div>
   )
 }
+
+export function StripOptionsForm() {
+  const o = useApp((s) => s.options.strip)
+  const set = useApp((s) => s.setOptions)
+  const update = (patch: Partial<typeof o>) => set("strip", patch)
+
+  return (
+    <div className="space-y-4 p-3">
+      <Field label="Removes">
+        <p className="text-muted-foreground text-xs">EXIF (camera, date), GPS location, XMP, IPTC and comments.</p>
+      </Field>
+      <Toggle
+        label="Keep colour profile"
+        checked={o.keepColorProfile}
+        onChange={(keepColorProfile) => update({ keepColorProfile })}
+      />
+      <p className="text-muted-foreground text-xs">
+        Saves a copy named “name (clean)” in the same format. The colour profile holds nothing personal; keeping it
+        stops photos from looking washed out.
+      </p>
+    </div>
+  )
+}

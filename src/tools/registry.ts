@@ -1,19 +1,20 @@
 import type { ComponentType } from "react"
-import { AudioLines, Clapperboard, Film, ImageIcon, type LucideIcon, Repeat } from "lucide-react"
+import { AudioLines, Clapperboard, EyeOff, Film, ImageIcon, type LucideIcon, Repeat, Tags } from "lucide-react"
 
 import type { DependencyName, MediaKind, OperationType } from "@/lib/types"
-import { AudioOptionsForm, GifOptionsForm, ImageOptionsForm, VideoOptionsForm } from "@/tools/options"
+import { AudioOptionsForm, GifOptionsForm, ImageOptionsForm, StripOptionsForm, VideoOptionsForm } from "@/tools/options"
 
 // v0.1 keeps tool definitions in the frontend. In v0.2 they move to a Rust
 // registry with parameter schemas, and this file shrinks to icons and forms.
 
-export type ToolCategory = "convert" | "frames" | "edit" | "audio" | "inspect"
+export type ToolCategory = "convert" | "frames" | "edit" | "audio" | "metadata" | "inspect"
 
 export const CATEGORIES: { id: ToolCategory; label: string; icon: LucideIcon }[] = [
   { id: "convert", label: "Convert", icon: Repeat },
   { id: "frames", label: "Frames", icon: Clapperboard },
   { id: "edit", label: "Edit", icon: Film },
   { id: "audio", label: "Audio", icon: AudioLines },
+  { id: "metadata", label: "Metadata", icon: Tags },
 ]
 
 export interface ToolDef {
@@ -72,6 +73,17 @@ export const TOOLS: ToolDef[] = [
     operation: "gif",
     requires: "ffmpeg",
     Options: GifOptionsForm,
+  },
+  {
+    id: "metadata.strip",
+    name: "Strip metadata",
+    description: "Remove EXIF, GPS location and other hidden details from photos before you share them.",
+    category: "metadata",
+    icon: EyeOff,
+    accepts: ["image"],
+    operation: "strip",
+    requires: "magick",
+    Options: StripOptionsForm,
   },
 ]
 

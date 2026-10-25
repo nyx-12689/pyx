@@ -25,3 +25,8 @@ dist-ssr
 
 # Local tooling settings (Claude Code)
 .claude/
+
+# Environment files (keep secrets out of git)
+.env
+.env.*
+!.env.example

@@ -33,6 +33,7 @@ pub enum Operation {
     Video(VideoOptions),
     Audio(AudioOptions),
     Gif(GifOptions),
+    Strip(StripOptions),
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]
@@ -115,6 +116,13 @@ pub struct GifOptions {
     width: u32,
 }
 
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StripOptions {
+    /// Keep the ICC colour profile, so colours don't shift once the rest is gone.
+    keep_color_profile: bool,
+}
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct JobRequest {
@@ -192,7 +200,7 @@ pub async fn start_job(app: AppHandle, jobs: State<'_, Jobs>, request: JobReques
     }
     let plan = {
         let mut reserved = jobs.reserved.lock().unwrap();
-        let output = unique_output(&input, request.output_dir.as_deref(), extension(&request.operation), &reserved);
+        let output = unique_output(&input, request.output_dir.as_deref(), &output_name(&input, &request.operation), &reserved);
         let plan = build_plan(&input, output.clone(), &request.operation)?;
         reserved.insert(output);
         plan
@@ -214,7 +222,7 @@ pub struct CommandPreview {
 #[tauri::command]
 pub fn preview_command(input: String, output_dir: Option<String>, operation: Operation) -> Result<CommandPreview, String> {
     let input = PathBuf::from(input);
-    let output = unique_output(&input, output_dir.as_deref(), extension(&operation), &HashSet::new());
+    let output = unique_output(&input, output_dir.as_deref(), &output_name(&input, &operation), &HashSet::new());
     let plan = build_plan(&input, output, &operation)?;
     Ok(CommandPreview {
         command: logs::shell_command(plan.tool.binary_name(), &plan.args),
@@ -431,6 +439,23 @@ async fn report_progress(app: AppHandle, id: String, stdout: impl AsyncRead + Un
 // ---------------------------------------------------------------------------
 // Building commands
 
+/// What follows the input's stem in the output's name, and the output's extension.
+struct OutputName {
+    suffix: &'static str,
+    ext: String,
+}
+
+fn output_name(input: &Path, op: &Operation) -> OutputName {
+    match op {
+        // Same format as the input, named so it can't be mistaken for the original.
+        Operation::Strip(_) => OutputName {
+            suffix: " (clean)",
+            ext: input.extension().and_then(|e| e.to_str()).unwrap_or("png").to_ascii_lowercase(),
+        },
+        _ => OutputName { suffix: "", ext: extension(op).to_string() },
+    }
+}
+
 fn extension(op: &Operation) -> &'static str {
     match op {
         Operation::Image(o) => match o.format {
@@ -454,16 +479,18 @@ fn extension(op: &Operation) -> &'static str {
             AudioFormat::Wav => "wav",
         },
         Operation::Gif(_) => "gif",
+        Operation::Strip(_) => unreachable!("strip keeps the input's extension"),
     }
 }
 
-/// `<dir>/<stem>.<ext>`, or `<stem> (2).<ext>` etc. if that's taken.
-fn unique_output(input: &Path, output_dir: Option<&str>, ext: &str, reserved: &HashSet<PathBuf>) -> PathBuf {
+/// `<dir>/<stem><suffix>.<ext>`, or `<stem><suffix> (2).<ext>` etc. if that's taken.
+fn unique_output(input: &Path, output_dir: Option<&str>, name: &OutputName, reserved: &HashSet<PathBuf>) -> PathBuf {
     let dir = output_dir
         .map(PathBuf::from)
         .or_else(|| input.parent().map(Path::to_path_buf))
         .unwrap_or_default();
-    let stem = input.file_stem().and_then(|s| s.to_str()).unwrap_or("output");
+    let stem = format!("{}{}", input.file_stem().and_then(|s| s.to_str()).unwrap_or("output"), name.suffix);
+    let ext = &name.ext;
     (1..)
         .map(|n| match n {
             1 => dir.join(format!("{stem}.{ext}")),
@@ -481,6 +508,10 @@ fn build_plan(input: &Path, output: PathBuf, op: &Operation) -> Result<Plan, Str
         let args = magick_image_args(&input_str, &output_str, o);
         return Ok(Plan { tool: Tool::Magick, args, output: Some(output), progress_input: None });
     }
+    if let Operation::Strip(o) = op {
+        let args = magick_strip_args(&input_str, &output_str, o)?;
+        return Ok(Plan { tool: Tool::Magick, args, output: Some(output), progress_input: None });
+    }
 
     let mut args: Vec<String> =
         ["-hide_banner", "-nostdin", "-y", "-loglevel", "info", "-stats", "-progress", "pipe:1", "-i"]
@@ -492,7 +523,7 @@ fn build_plan(input: &Path, output: PathBuf, op: &Operation) -> Result<Plan, Str
         Operation::Video(o) => args.extend(ffmpeg_video_args(o)?),
         Operation::Audio(o) => args.extend(ffmpeg_audio_args(o)),
         Operation::Gif(o) => args.extend(ffmpeg_gif_args(o)),
-        Operation::Image(_) => unreachable!(),
+        Operation::Image(_) | Operation::Strip(_) => unreachable!(),
     }
     args.push(output_str);
     Ok(Plan { tool: Tool::Ffmpeg, args, output: Some(output), progress_input: Some(input.to_path_buf()) })
@@ -527,6 +558,34 @@ fn magick_image_args(input: &str, output: &str, o: &ImageOptions) -> Vec<String>
     }
     args.push(output.to_string());
     args
+}
+
+/// Rewrites an image in its own format without EXIF (camera, dates, GPS), XMP, IPTC,
+/// comments or embedded thumbnails.
+fn magick_strip_args(input: &str, output: &str, o: &StripOptions) -> Result<Vec<String>, String> {
+    let ext = Path::new(output).extension().and_then(|e| e.to_str()).unwrap_or_default().to_ascii_lowercase();
+    match ext.as_str() {
+        "svg" => return Err("SVG files are drawings, not photos; they have no EXIF to remove.".into()),
+        "psd" => return Err("Photoshop files can't be rewritten without losing their layers.".into()),
+        _ => {}
+    }
+    // Turn the pixels upright first: the orientation tag that tells viewers to rotate goes with the EXIF.
+    let mut args = vec!["-verbose".into(), input.to_string(), "-auto-orient".into()];
+    if o.keep_color_profile {
+        // Every embedded profile except the ICC one (EXIF, XMP, IPTC, 8BIM), and the comment.
+        args.extend(["+profile", "!icc,*", "+set", "comment"].map(String::from));
+    } else {
+        args.push("-strip".into());
+    }
+    match ext.as_str() {
+        // PNG: no creation/modification time chunks either.
+        "png" => args.extend(["-define", "png:exclude-chunks=date,time"].map(String::from)),
+        // JPEG keeps its own quality setting by default; these formats would fall back to magick's lower default.
+        "webp" | "avif" | "heic" | "heif" => args.extend(["-quality", "92"].map(String::from)),
+        _ => {}
+    }
+    args.push(output.to_string());
+    Ok(args)
 }
 
 fn ffmpeg_video_args(o: &VideoOptions) -> Result<Vec<String>, String> {
@@ -645,7 +704,7 @@ mod tests {
     }
 
     fn run_plan(input: &Path, op: Operation) -> PathBuf {
-        let output = unique_output(input, None, extension(&op), &HashSet::new());
+        let output = unique_output(input, None, &output_name(input, &op), &HashSet::new());
         let plan = build_plan(input, output, &op).unwrap();
         let out = StdCommand::new(tools::resolve(plan.tool).unwrap()).args(&plan.args).output().unwrap();
         assert!(out.status.success(), "{op:?} failed:\n{}", String::from_utf8_lossy(&out.stderr));
@@ -698,10 +757,89 @@ mod tests {
     fn output_names_avoid_collisions() {
         let dir = std::env::temp_dir();
         let input = dir.join("does-not-exist.png");
-        let first = unique_output(&input, None, "webp", &HashSet::new());
-        let second = unique_output(&input, None, "webp", &HashSet::from([first.clone()]));
+        let name = OutputName { suffix: "", ext: "webp".into() };
+        let first = unique_output(&input, None, &name, &HashSet::new());
+        let second = unique_output(&input, None, &name, &HashSet::from([first.clone()]));
         assert_eq!(first.file_name().unwrap(), "does-not-exist.webp");
         assert_eq!(second.file_name().unwrap(), "does-not-exist (2).webp");
+    }
+
+    /// A JPEG with an EXIF block (an Artist tag, standing in for camera and GPS data) and a comment.
+    fn jpeg_with_metadata(dir: &Path) -> PathBuf {
+        let plain = dir.join("plain.jpg");
+        let ok = StdCommand::new(tools::resolve(Tool::Magick).unwrap())
+            .args(["-size", "320x240", "gradient:#0ea5e9-#f59e0b", "-set", "comment", "PYX-SECRET-COMMENT", "-quality", "83"])
+            .arg(&plain)
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok, "fixture jpeg");
+        let artist = b"PYX-SECRET-ARTIST\0";
+        let mut tiff = b"MM\0\x2a\0\0\0\x08".to_vec(); // big-endian TIFF header, first IFD at 8
+        tiff.extend([0, 1]); // one entry: Artist (0x013b), ASCII, stored after the IFD at offset 26
+        tiff.extend([0x01, 0x3b, 0, 2]);
+        tiff.extend((artist.len() as u32).to_be_bytes());
+        tiff.extend(26u32.to_be_bytes());
+        tiff.extend(0u32.to_be_bytes()); // no next IFD
+        tiff.extend(artist);
+        let mut app1 = b"Exif\0\0".to_vec();
+        app1.extend(tiff);
+        let jpeg = std::fs::read(&plain).unwrap();
+        let mut out = jpeg[..2].to_vec(); // SOI
+        out.extend([0xff, 0xe1]);
+        out.extend(((app1.len() + 2) as u16).to_be_bytes());
+        out.extend(app1);
+        out.extend(&jpeg[2..]);
+        let path = dir.join("tagged.jpg");
+        std::fs::write(&path, out).unwrap();
+        path
+    }
+
+    fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+        haystack.windows(needle.len()).any(|w| w == needle)
+    }
+
+    fn jpeg_quality(path: &Path) -> String {
+        let out = StdCommand::new(tools::resolve(Tool::Magick).unwrap()).args(["identify", "-format", "%Q"]).arg(path).output().unwrap();
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    }
+
+    #[test]
+    fn strip_removes_exif_and_comments() {
+        let dir = std::env::temp_dir().join(format!("pyx-strip-tests-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let input = jpeg_with_metadata(&dir);
+        let before = std::fs::read(&input).unwrap();
+        assert!(contains(&before, b"PYX-SECRET-ARTIST") && contains(&before, b"PYX-SECRET-COMMENT"));
+
+        for keep_color_profile in [true, false] {
+            let output = run_plan(&input, Operation::Strip(StripOptions { keep_color_profile }));
+            assert_eq!(output.file_name().unwrap().to_str().unwrap().split(" (clean)").next(), Some("tagged"));
+            assert_eq!(output.extension().unwrap(), "jpg");
+            let after = std::fs::read(&output).unwrap();
+            assert!(!contains(&after, b"Exif\0\0"), "EXIF left in {output:?}");
+            assert!(!contains(&after, b"PYX-SECRET-ARTIST"), "Artist left in {output:?}");
+            assert!(!contains(&after, b"PYX-SECRET-COMMENT"), "comment left in {output:?}");
+            assert_eq!(jpeg_quality(&output), jpeg_quality(&input), "JPEG quality changed");
+        }
+
+        let png = dir.join("graphic.png");
+        let ok = StdCommand::new(tools::resolve(Tool::Magick).unwrap())
+            .args(["-size", "200x200", "xc:#16171a", "-set", "comment", "PYX-SECRET-COMMENT"])
+            .arg(&png)
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok, "fixture png");
+        let output = run_plan(&png, Operation::Strip(StripOptions { keep_color_profile: true }));
+        assert!(!contains(&std::fs::read(output).unwrap(), b"PYX-SECRET-COMMENT"), "comment left in PNG");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn strip_refuses_svg() {
+        let op = Operation::Strip(StripOptions { keep_color_profile: true });
+        assert!(build_plan(Path::new("logo.svg"), PathBuf::from("logo (clean).svg"), &op).is_err());
     }
 
     #[test]

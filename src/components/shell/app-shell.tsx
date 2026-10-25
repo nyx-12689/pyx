@@ -15,6 +15,7 @@ import { PolishedToaster } from "@/components/ui/halo-toast"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { useFullscreen } from "@/hooks/use-fullscreen"
 import { api } from "@/lib/api"
+import { articleById } from "@/lib/format-wiki"
 import { useResolvedTheme } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/store"
@@ -23,11 +24,13 @@ import { toolById } from "@/tools/registry"
 function usePageTitle(): string {
   const { pathname } = useLocation()
   if (pathname.startsWith("/tools/")) return toolById(pathname.slice("/tools/".length))?.name ?? "Tool"
+  if (pathname.startsWith("/formats/")) return articleById(pathname.slice("/formats/".length))?.name ?? "Formats"
   const titles: Record<string, string> = {
     "/": "Dashboard",
     "/tools": "Tools",
     "/activity": "Activity",
     "/dependencies": "Dependencies",
+    "/formats": "Formats",
     "/settings": "Settings",
   }
   return titles[pathname] ?? ""

@@ -71,11 +71,17 @@ export interface GifOptions {
   width: number
 }
 
+export interface StripOptions {
+  /** Keep the ICC colour profile, so colours don't shift. */
+  keepColorProfile: boolean
+}
+
 export type Operation =
   | ({ type: "image" } & ImageOptions)
   | ({ type: "video" } & VideoOptions)
   | ({ type: "audio" } & AudioOptions)
   | ({ type: "gif" } & GifOptions)
+  | ({ type: "strip" } & StripOptions)
 
 export type OperationType = Operation["type"]
 
