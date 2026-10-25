@@ -1,5 +1,5 @@
 # Builds Pyx for Apple Silicon, Intel and both (universal), and attaches the
-# disk images to a draft GitHub release. Runs when a version tag (v1.2.3) is
+# disk images to a draft GitHub release whose notes come from CHANGELOG.md. Runs when a version tag (v1.2.3) is
 # pushed, or by hand from the Actions tab for an existing tag.
 name: Release
 
@@ -49,24 +49,23 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      # The release notes: this version's CHANGELOG.md section, then how to download.
+      # Fails the build when the changelog has no section for the tag.
+      - id: notes
+        run: |
+          {
+            echo "body<<RELEASE_NOTES_EOF"
+            python3 .github/scripts/release-notes.py "${{ inputs.tag || github.ref_name }}"
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ inputs.tag || github.ref_name }}
           releaseName: Pyx ${{ inputs.tag || github.ref_name }}
-          releaseBody: |
-            Downloads for macOS 13 or later:
-
-            - **Apple Silicon** (M1 and later): the `aarch64` disk image
-            - **Intel**: the `x64` disk image
-            - **Either**: the `universal` disk image works on both, at about twice the size
-
-            Pyx isn't signed with a paid Apple Developer certificate, so macOS will block it the first
-            time. Open it once, then go to **System Settings → Privacy & Security** and click
-            **Open Anyway**.
-
-            Pyx needs ffmpeg and ImageMagick; if they're missing, it offers to install them with Homebrew.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
