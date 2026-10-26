@@ -3,12 +3,15 @@
 usage: python3 .github/scripts/release-notes.py v0.1.0
 
 Fails if CHANGELOG.md has no section for the version, so no release ships without one.
-Release notes keep every line break, so wrapped lines are joined back into paragraphs.
+Release notes keep every line break, so any wrapped lines are joined back into paragraphs,
+and links into the repository are made absolute, since the notes live outside it.
 """
 
 import re
 import sys
 from pathlib import Path
+
+REPO = "https://github.com/nyx-12689/pyx"
 
 DOWNLOAD = """\
 Downloads for macOS 13 or later:
@@ -28,14 +31,15 @@ def section(changelog: str, version: str) -> str:
     match = re.search(rf"^## {re.escape(version)}\s*$(.*?)(?=^## |\Z)", changelog, re.M | re.S)
     if not match:
         sys.exit(f"CHANGELOG.md has no '## {version}' section; add one before releasing.")
-    return match.group(1).strip()
+    # Drop the divider that separates it from the next release.
+    return re.sub(r"\n-{3,}\s*$", "", match.group(1).strip()).strip()
 
 
 def unwrap(markdown: str) -> str:
-    """Joins wrapped lines, keeping headings, list items and blank lines as they are."""
+    """Joins wrapped lines, keeping headings, list items (nested too) and blank lines as they are."""
     out: list[str] = []
     for line in markdown.split("\n"):
-        starts_block = line == "" or line.startswith(("#", "- ", "* ", "|", "```"))
+        starts_block = line == "" or line.lstrip().startswith(("#", "- ", "* ", "|", "```", "*Released"))
         if out and not starts_block and out[-1] and not out[-1].startswith("#"):
             out[-1] += " " + line.strip()
         else:
@@ -43,13 +47,18 @@ def unwrap(markdown: str) -> str:
     return "\n".join(out)
 
 
+def absolute_links(markdown: str) -> str:
+    """Points relative links (docs/brand/README.md) at the repository on GitHub."""
+    return re.sub(r"\]\((?!https?://|#)([^)]+)\)", lambda m: f"]({REPO}/blob/main/{m.group(1)})", markdown)
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     version = sys.argv[1].removeprefix("v")
     changelog = Path(__file__).resolve().parents[2].joinpath("CHANGELOG.md").read_text()
-    print(f"## What's new\n\n{unwrap(section(changelog, version))}\n")
-    print("Full history in [CHANGELOG.md](https://github.com/nyx-12689/pyx/blob/main/CHANGELOG.md).\n")
+    print(f"## What's new\n\n{absolute_links(unwrap(section(changelog, version)))}\n")
+    print(f"Full history in [CHANGELOG.md]({REPO}/blob/main/CHANGELOG.md).\n")
     print(f"## Download\n\n{DOWNLOAD}")
 
 
